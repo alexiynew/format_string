@@ -17,11 +17,9 @@ class formater_base {
 protected:
 	formater_base() {}
 	virtual ~formater_base() {}
-	virtual void print_value(std::istream& in, std::ostream& out) = 0;
+	virtual void print_value(std::istream& in, std::ostream& out, size_t index) = 0;
 
 	// Internal types
-	enum class indexing_mode { none, automatic, manual };
-	
 	struct value_base {
 		virtual ~value_base(){};
 		virtual void print_to(std::ostream& os) const = 0;
@@ -41,6 +39,29 @@ protected:
 		return new value_holder<T>(t);
 	}
 
+	size_t get_index(std::istringstream& in)
+	{
+		size_t index = 0xFFFFFFFF;
+		char next_char = in.peek();
+		if (next_char == '}' || next_char == ':') {
+			if (mode == indexing_mode::manual) { 
+				throw std::logic_error("You can not switch from manual fild indexing mode to automatic"); 
+			}
+			mode = indexing_mode::automatic;
+			index = next_index++;
+		} else if (std::isdigit(in.peek())) {
+			if (mode == indexing_mode::automatic) { 
+				throw std::logic_error("You can not switch from automatic fild indexing mode to manual"); 
+			}
+			mode = indexing_mode::manual;
+			in >> index;
+		} else 	{ 
+			throw std::logic_error("Index number expected"); 
+		}	
+
+		return index;
+	}
+
 	std::string parse(const std::string& str)
 	{
 		std::istringstream in(str);
@@ -54,8 +75,8 @@ protected:
 					in.ignore(1); 
 					continue; 
 				}
-				
-				print_value(in, out);
+				size_t index = get_index(in); 
+				print_value(in, out, index);
 	
 				in.get(c);
 				if (c != '}') { 
@@ -74,44 +95,32 @@ protected:
 		}
 		return out.str();
 	}
+
+private:
+	enum class indexing_mode { none, automatic, manual };
+	
+	formater_base::indexing_mode mode;
+	size_t next_index;
 };
 
 template <size_t N>
 class formater : private formater_base {
 	// format data
 	std::unique_ptr<value_base> values[N];
-	formater_base::indexing_mode mode;
-	size_t next_index;
-	
+
 	// constructor
 	template <typename... Args>
 	formater(Args&&... args) 
-		: values{std::unique_ptr<value_base>(make_value_holder(args))...,}, mode(indexing_mode::none), next_index(0)
+		: values{std::unique_ptr<value_base>(make_value_holder(args))...,}
 	{}
 	
-	void print_value(std::istream& in, std::ostream& out) override
+	void print_value(std::istream& in, std::ostream& out, size_t index) override
 	{
-		size_t index; 
-		
-		if (in.peek() == '}') {
-			if (mode == indexing_mode::manual) { 
-				throw std::logic_error("You can not switch from manual fild indexing mode to automatic"); 
-			}
-			mode = indexing_mode::automatic;
-			index = next_index++;
-		} else if (std::isdigit(in.peek())) {
-			if (mode == indexing_mode::automatic) { 
-				throw std::logic_error("You can not switch from automatic fild indexing mode to manual"); 
-			}
-			mode = indexing_mode::manual;
-			in >> index;
-		} else 	{ 
-			throw std::logic_error("Index number expected"); 
-		}
-		
 		if (index >= N) {
 			throw std::logic_error("Wrong index"); 
 		}
+
+		//char next_char = in.peek();
 		
 		values[index]->print_to(out);
 	}

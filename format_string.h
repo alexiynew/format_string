@@ -159,60 +159,75 @@ class formater : private formater_base {
 	friend std::string make_string (const std::string& str, Args&&... args);
 };
 
+char read_char_flag (const std::string& chars, std::string& format_str, const char default_value = '\0') 
+{
+	char out = default_value;
+	if (chars.find(format_str.back()) != std::string::npos) {
+		out = format_str.back();
+		format_str.pop_back();
+	}
+	return out;
+}
+
+size_t string_to_int (const std::string& str, size_t default_value = 0)
+{
+	std::istringstream ist(str);
+	size_t value = default_value;
+	ist >> value;
+	return value;
+}
+
+
 // Implementation
 void formater_base::value_format::parse(std::istream& in)
 {
 	if (in.peek() != ':') return;
 	in.ignore(1);
 	std::string format_str;
-	static std::string specifier_chars = "doxXeEfF";
-	static std::string flag_chars = "+-#0";
-	static std::string align_chars = "<>=";
+	
 	while (in.peek() != '}') {
 		format_str += in.peek();
 		in.ignore(1);
 	}
 	
 	// read specifier
-	if (specifier_chars.find(format_str.back()) != std::string::npos) {
-		specifier = format_str.back();
-		format_str.pop_back();
-	}
+	specifier = read_char_flag("doxXeEfF", format_str, specifier);
 	
 	// read precision and width
 	if (format_str.back() == '.') {
 		throw std::logic_error("Precision value expected after '.'");
 	}
 	
-	std::string number_str;
+	std::string width_str;
+	std::string precision_str;
+	std::string buf_str;
 	while (std::isdigit(format_str.back()) || format_str.back() == '.') {
-		number_str = format_str.back() + number_str;
+		buf_str = format_str.back() + buf_str;
 		format_str.pop_back();
 	}
 	
-	if (number_str.front() == '0') {
-		format_str += '0';
-		number_str.erase(0, 1);
+	std::string::size_type dot_pos = buf_str.find('.');
+	
+	if (dot_pos != std::string::npos) {
+		width_str = buf_str.substr(0, dot_pos);
+		precision_str = buf_str.substr(dot_pos + 1, buf_str.size() - dot_pos - 1);
+	} else {
+		width_str = buf_str; 
 	}
 	
-	std::stringstream number_stream(number_str);
-	number_stream >> width;
-	if (number_stream.peek() == '.') {
-		number_stream.ignore(1);
+	if (width_str.front() == '0' && width_str.size() > 1) {
+		format_str += '0';
+		width_str.erase(0, 1);
 	}
-	number_stream >> precision;
+
+	width = string_to_int(width_str, width);	
+	precision = string_to_int(precision_str, precision);
 	
 	// read flag
-	if (flag_chars.find(format_str.back()) != std::string::npos) {
-		flag = format_str.back();
-		format_str.pop_back();
-	}
+	flag = read_char_flag("+-#0", format_str, flag);
 	
 	// read align
-	if (align_chars.find(format_str.back()) != std::string::npos) {
-		align = format_str.back();
-		format_str.pop_back();
-	}
+	align = read_char_flag("<>=", format_str, align);
 	
 	if (format_str.size() == 1) {
 		fill = format_str.back();

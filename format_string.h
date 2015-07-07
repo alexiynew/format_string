@@ -14,181 +14,45 @@
 template <typename... Args>
 std::string make_string (const std::string& str, Args&&... args);
 
-// implements main functionality
-class formater_base {
-protected:
-	struct value_format {
-		size_t width;		// number
-		size_t precision;	// .number
-		char specifier;		// doxXeEfF
-		char fill;			// any char
-		char align;			// <>=
-		char flag;			// +-#0
-		
-		value_format () 
-			: width(0), precision(6), specifier('d'), fill(' '), align('<'), flag('-')
-		{}
-		
-		void parse(std::istream& in);
-		void set_to(std::ostream& os) const;
-	};
-		
-	formater_base() 
-		: mode(indexing_mode::none), next_index(0)
-	{}
-	virtual ~formater_base() {}
+namespace make_string_detail {
 
-	// make string from field with index and specific format
-	virtual std::string value_string(size_t index, const value_format& format) = 0;
-
-	// Internal types
-	struct value_base {
-		virtual ~value_base(){};
-		virtual void print_to(std::ostream& os) const = 0;
-	};
-
-	template <typename T>
-	struct value_holder : public value_base {
-		value_holder(const T& v) : value(v) {}
-		void print_to(std::ostream& os) const override { os << value; }
-		const T & value;
-	};
+struct value_format {
+	size_t width;		// number
+	size_t precision;	// .number
+	char specifier;		// doxXeEfF
+	char fill;			// any char
+	char align;			// <>=
+	char flag;			// +-#0
 	
-	// Helper functions
-	template <typename T>
-	static value_holder<T>* make_value_holder(const T& t)
-	{
-		return new value_holder<T>(t);
-	}
-
-	static char read_char_flag (const std::string& chars, std::string& format_str, const char default_value = '\0') 
-	{
-		char out = default_value;
-		if (chars.find(format_str.back()) != std::string::npos) {
-			out = format_str.back();
-			format_str.pop_back();
-		}
-		return out;
-	}
-
-	static size_t string_to_int (const std::string& str, size_t default_value = 0)
-	{
-		std::istringstream ist(str);
-		size_t value = default_value;
-		ist >> value;
-		return value;
-	}
-
-	void detect_mode(std::istringstream& in)
-	{
-		char next_char = in.peek();
-		if (next_char == '}' || next_char == ':') {
-			if (mode == indexing_mode::manual) { 
-				throw std::logic_error("Cannot switch from manual field specification mode to automatic field numbering"); 
-			}
-			mode = indexing_mode::automatic;
-		} else if (std::isdigit(in.peek())) {
-			if (mode == indexing_mode::automatic) { 
-				throw std::logic_error("Cannot switch from automatic field numbering to manual field specification"); 
-			}
-			mode = indexing_mode::manual;
-		} else 	{ 
-			throw std::logic_error("Field number expected"); 
-		}	
-	}
-
-	std::string parse(const std::string& str)
-	{
-		std::istringstream in(str);
-		std::ostringstream out;
-		char c;
-		while (in.get(c))
-		{
-			if (c == '{') {
-				if (in.peek() == '{') { 
-					out << '{'; 
-					in.ignore(1); 
-					continue; 
-				}
-
-				detect_mode(in);
-				
-				size_t index;
-				if (mode == indexing_mode::automatic) {
-					index = next_index++;
-				} else if (mode == indexing_mode::manual) {
-					in >> index;
-				} else {
-					throw std::logic_error("Cannot detect field numbering mode"); 
-				}
-
-				value_format format;
-				if (in.peek() == ':') {
-					format.parse(in);
-				}
-				
-				out << value_string(index, format);
-				
-				in.get(c);
-				if (c != '}') { 
-					throw std::logic_error("'}' expected"); 
-				}
-			} else if (c == '}') {
-				if (in.peek() == '}') { 
-					out << '}'; 
-					in.ignore(1); 
-					continue; 
-				}
-				throw std::logic_error("Single '}' in format string"); 
-			} else {
-				out << c;
-			}
-		}
-		return out.str();
-	}
-
-private:
-	enum class indexing_mode { none, automatic, manual };
-	
-	formater_base::indexing_mode mode;
-	size_t next_index;
-};
-
-template <size_t N>
-class formater : public formater_base {
-private:
-	// field values
-	std::unique_ptr<value_base> values[N];
-
-	// fill values from args
-	template <typename... Args>
-	formater(Args&&... args) 
-		: values{std::unique_ptr<value_base>(make_value_holder(args))...,}
+	value_format () 
+		: width(0), precision(6), specifier('d'), fill(' '), align('<'), flag('-')
 	{}
 	
-	// make string from field with index and specific format
-	std::string value_string(size_t index, const formater_base::value_format& format) override
-	{
-		std::ostringstream buf;
-		if (index >= N) {
-			buf << index;
-			throw std::logic_error(std::string("Index ") + buf.str() + " out of range"); 
-		}
-		
-		format.set_to(buf);
-		values[index]->print_to(buf);
-		
-		return buf.str();
-	}
-
-	// give access to private methods
-	template <typename... Args>
-	friend std::string make_string (const std::string& str, Args&&... args);
+	void parse(std::istream& in);
+	void set_to(std::ostream& os) const;
 };
 
+// format helper functions	
+char read_last_char_def (const std::string& chars, std::string& format_str, const char default_value = '\0') 
+{
+	char out = default_value;
+	if (chars.find(format_str.back()) != std::string::npos) {
+		out = format_str.back();
+		format_str.pop_back();
+	}
+	return out;
+}
+
+size_t string_to_int (const std::string& str, size_t default_value = 0)
+{
+	std::istringstream ist(str);
+	size_t value = default_value;
+	ist >> value;
+	return value;
+}
 
 // implementation of value_format parser
-void formater_base::value_format::parse(std::istream& in)
+void value_format::parse(std::istream& in)
 {
 	if (in.peek() != ':') return;
 	in.ignore(1);
@@ -201,7 +65,7 @@ void formater_base::value_format::parse(std::istream& in)
 	}
 	
 	// read specifier
-	specifier = formater_base::read_char_flag("doxXeEfF", format_str, specifier);
+	specifier = read_last_char_def("doxXeEfF", format_str, specifier);
 	
 	// read precision and width
 	if (format_str.back() == '.') {
@@ -231,14 +95,14 @@ void formater_base::value_format::parse(std::istream& in)
 		width_str.erase(0, 1);
 	}
 
-	width = formater_base::string_to_int(width_str, width);	
-	precision = formater_base::string_to_int(precision_str, precision);
+	width = string_to_int(width_str, width);	
+	precision = string_to_int(precision_str, precision);
 	
 	// read sign
-	flag = formater_base::read_char_flag("+-#0", format_str, flag);
+	flag = read_last_char_def("+-#0", format_str, flag);
 	
 	// read align
-	align = formater_base::read_char_flag("<>=", format_str, align);
+	align = read_last_char_def("<>=", format_str, align);
 	
 	// get fill char
 	if (format_str.size() == 1) {
@@ -251,7 +115,7 @@ void formater_base::value_format::parse(std::istream& in)
 	}
 }
 
-void formater_base::value_format::set_to(std::ostream& os) const
+void value_format::set_to(std::ostream& os) const
 {
 	switch (specifier) {
 		case 'd': os << std::dec; break;
@@ -288,14 +152,105 @@ void formater_base::value_format::set_to(std::ostream& os) const
 	}
 }
 
+// value wrapper
+struct value_base {
+	virtual ~value_base(){};
+	virtual void print_to(std::ostream& os) const = 0;
+};
+
+template <typename T>
+struct value_holder : public value_base {
+	value_holder(const T& v) : value(v) {}
+	void print_to(std::ostream& os) const override { os << value; }
+	const T & value;
+};
+
+template <typename T>
+inline std::unique_ptr<value_base> make_value_holder_ptr(const T& t)
+{
+	return std::unique_ptr<value_base>(new value_holder<T>(t));
+}
+
+std::string make_string_impl (const std::string& str, const std::unique_ptr<value_base> * const values , const size_t values_count)
+{
+	enum class indexing_mode { none, automatic, manual };
+
+	indexing_mode mode;
+	size_t next_index = 0;
+
+	std::istringstream in(str);
+	std::ostringstream out;
+	char c;
+	while (in.get(c))
+	{
+		if (c == '{') {
+			if (in.peek() == '{') { 
+				out << '{'; 
+				in.ignore(1); 
+				continue; 
+			}
+
+			size_t index;
+			char next_char = in.peek();
+			if (next_char == '}' || next_char == ':') {
+				if (mode == indexing_mode::manual) { 
+					throw std::logic_error("Cannot switch from manual field specification mode to automatic field numbering"); 
+				}
+				mode = indexing_mode::automatic;
+				index = next_index++;
+			} else if (std::isdigit(in.peek())) {
+				if (mode == indexing_mode::automatic) { 
+					throw std::logic_error("Cannot switch from automatic field numbering to manual field specification"); 
+				}
+				mode = indexing_mode::manual;
+				in >> index;
+			} else 	{ 
+				throw std::logic_error("Field number expected"); 
+			}	
+			
+			value_format format;
+			if (in.peek() == ':') {
+				format.parse(in);
+			}			
+
+			if (index >= values_count) {
+				std::ostringstream buf;
+				buf << index;
+				throw std::logic_error(std::string("Index ") + buf.str() + " out of range"); 
+			}
+		
+			format.set_to(out);
+			values[index]->print_to(out);
+			
+			in.get(c);
+			if (c != '}') { 
+				throw std::logic_error("'}' expected"); 
+			}
+		} else if (c == '}') {
+			if (in.peek() == '}') { 
+				out << '}'; 
+				in.ignore(1); 
+				continue; 
+			}
+			throw std::logic_error("Single '}' in format string"); 
+		} else {
+			out << c;
+		}
+	}
+	return out.str();
+}
+
+}; // namespace make_string_detail
+
 // implementation of interface functionality
 template <typename... Args>
 std::string make_string (const std::string& str, Args&&... args)
 {
-	formater<sizeof...(args)> f(args...);
-	return f.parse(str);
-}
+	using namespace make_string_detail;
 
+	std::unique_ptr<value_base> values[sizeof...(args)] = {(make_value_holder_ptr(args))...,};
+	return make_string_impl(str, values, sizeof...(args));
+}
 
 
 #endif // FORMAT_STRING_H

@@ -63,7 +63,10 @@ void value_format::parse(std::istream& in)
 		format_str += in.peek();
 		in.ignore(1);
 	}
-	
+
+	if (format_str.empty()) {
+		throw std::logic_error("Empty format string after ':'");
+	}
 	// read specifier
 	specifier = read_last_char_def("doxXeEfF", format_str, specifier);
 	

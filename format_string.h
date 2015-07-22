@@ -4,7 +4,6 @@
 #include <sstream>
 #include <exception>
 #include <memory>
-#include <cctype>
 #include <iomanip>
 #include <iostream>
 
@@ -25,7 +24,7 @@ struct value_format {
 	char flag;			// +-#0
 	
 	value_format () 
-		: width(0), precision(6), specifier('d'), fill(' '), align('<'), flag('-')
+		: width(0), precision(6), specifier('\0'), fill('\0'), align('\0'), flag('\0')
 	{}
 	
 	void parse(std::istream& in);
@@ -33,9 +32,9 @@ struct value_format {
 };
 
 // format helper functions	
-char read_last_char_def (const std::string& chars, std::string& format_str, const char default_value = '\0') 
+char read_last_char (const std::string& chars, std::string& format_str) 
 {
-	char out = default_value;
+	char out = '\0';
 	if (chars.find(format_str.back()) != std::string::npos) {
 		out = format_str.back();
 		format_str.pop_back();
@@ -68,7 +67,7 @@ void value_format::parse(std::istream& in)
 		throw std::logic_error("Empty format string after ':'");
 	}
 	// read specifier
-	specifier = read_last_char_def("doxXeEfF", format_str, specifier);
+	specifier = read_last_char("doxXeEfF", format_str);
 	
 	// read precision and width
 	if (format_str.back() == '.') {
@@ -102,16 +101,21 @@ void value_format::parse(std::istream& in)
 	precision = string_to_int(precision_str, precision);
 	
 	// read sign
-	flag = read_last_char_def("+-#0", format_str, flag);
+	flag = read_last_char("+-#0", format_str);
 	
 	// read align
-	align = read_last_char_def("<>=", format_str, align);
+	align = read_last_char("<>=", format_str);
 	
 	// get fill char
 	if (format_str.size() == 1) {
 		fill = format_str.back();
 		format_str.pop_back();
 	}
+
+    // fill require align 
+    if (fill != '\0' && align == '\0') {
+        throw std::logic_error("Expected align specification");
+    }
 
 	if (!format_str.empty()) {
 		throw std::logic_error("Wrong field format");
@@ -121,6 +125,7 @@ void value_format::parse(std::istream& in)
 void value_format::set_to(std::ostream& os) const
 {
 	switch (specifier) {
+        case '\0':
 		case 'd': os << std::dec; break;
 		case 'o': os << std::oct; break;
 		case 'x': os << std::hex; break;
@@ -136,6 +141,7 @@ void value_format::set_to(std::ostream& os) const
 	os.width(width);
 	
 	switch (flag) {
+        case '\0':
 		case '-' : os << std::noshowpos; break;
 		case '+' : os << std::showpos; break;
 		case '#' : os << std::showbase << std::showpoint; break;
@@ -144,6 +150,7 @@ void value_format::set_to(std::ostream& os) const
 	}
 
 	switch (align) {
+        case '\0': if (flag == '0') { os << std::internal; break; }
 		case '<': os << std::left; break;
 		case '>': os << std::right; break;
 		case '=': os << std::internal; break;
@@ -151,7 +158,7 @@ void value_format::set_to(std::ostream& os) const
 	}
 	
 	if (flag != '0') {
-		os << std::setfill(fill);
+		os << std::setfill(fill == '\0' ? ' ' : fill);
 	}
 }
 
@@ -174,10 +181,10 @@ inline std::unique_ptr<value_base> make_value_holder_ptr(const T& t)
 	return std::unique_ptr<value_base>(new value_holder<T>(t));
 }
 
+enum class indexing_mode { none, automatic, manual };
+
 std::string make_string_impl (const std::string& str, const std::unique_ptr<value_base> * const values , const size_t values_count)
 {
-	enum class indexing_mode { none, automatic, manual };
-
 	indexing_mode mode;
 	size_t next_index = 0;
 
@@ -243,7 +250,7 @@ std::string make_string_impl (const std::string& str, const std::unique_ptr<valu
 	return out.str();
 }
 
-}; // namespace make_string_detail
+} // namespace make_string_detail
 
 // implementation of interface functionality
 template <typename... Args>
@@ -257,3 +264,4 @@ std::string make_string (const std::string& str, Args&&... args)
 
 
 #endif // FORMAT_STRING_H
+

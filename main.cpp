@@ -60,14 +60,14 @@ int main ()
 	TEST(make_string("{0:X}", 42), "2A");
 	TEST(make_string("{0:x}", 0.123456789), "0.123457");
 	TEST(make_string("{0:X}", 0.123456789), "0.123457");
-	TEST(make_string("{0:e}", 0.123456789), "1.234568e-001");
-	TEST(make_string("{0:E}", 0.123456789), "1.234568E-001");
+	TEST(make_string("{0:e}", 0.123456789), "1.234568e-01");
+	TEST(make_string("{0:E}", 0.123456789), "1.234568E-01");
 	TEST(make_string("{0:f}", 0.123456789), "0.123457");
 	TEST(make_string("{0:F}", 0.123456789), "0.123457");
 
 	ERROR_TEST(make_string("{0:}", 1), "Empty format string after ':'");
 	ERROR_TEST(make_string("{0:rr}", 1), "Wrong field format");
-	ERROR_TEST(make_string("{0:a}", 1), "Wrong field format");
+	ERROR_TEST(make_string("{0:a}", 1), "Expected align specification");
 	std::cout << "----------------------------" << std::endl << std::endl;
 	
 
@@ -75,30 +75,30 @@ int main ()
 	TEST(make_string("{0:f}", 0.123456789), "0.123457");
 	TEST(make_string("{0:.1f}", 0.123456789), "0.1");
 	TEST(make_string("{0:.10f}", 0.123456789), "0.1234567890");
-	TEST(make_string("{0:.20f}", 0.123456789), "0.12345678900000000000");
+	TEST(make_string("{0:.20f}", 0.123456789), "0.12345678899999999734");
 	TEST(make_string("{0:.6f}", 0.123456789), "0.123457");
 	TEST(make_string("{0:.5f}", 0.123456789), "0.12346");
 
 	TEST(make_string("{:.5} {}", 123456789, "no effect"), "123456789 no effect");
 	TEST(make_string("{:.5} {}", "some string", "no effect"), "some string no effect");
 
-	TEST(make_string("{0:.1}", 12.123456789), "?");
-	TEST(make_string("{0:.2}", 12.123456789), "?");
-	TEST(make_string("{0:.3}", 12.123456789), "?");
-	TEST(make_string("{0:.4}", 12.123456789), "?");
-	TEST(make_string("{0:.5}", 12.123456789), "?");
+	TEST(make_string("{0:.1}", 12.123456789), "1e+01");
+	TEST(make_string("{0:.2}", 12.123456789), "12");
+	TEST(make_string("{0:.3}", 12.123456789), "12.1");
+	TEST(make_string("{0:.4}", 12.123456789), "12.12");
+	TEST(make_string("{0:.5}", 12.123456789), "12.123");
 
-	TEST(make_string("{0:.1f}", 12.123456789), "?");
-	TEST(make_string("{0:.2f}", 12.123456789), "?");
-	TEST(make_string("{0:.3f}", 12.123456789), "?");
-	TEST(make_string("{0:.4f}", 12.123456789), "?");
-	TEST(make_string("{0:.5f}", 12.123456789), "?");
+	TEST(make_string("{0:.1f}", 12.123456789), "12.1");
+	TEST(make_string("{0:.2f}", 12.123456789), "12.12");
+	TEST(make_string("{0:.3f}", 12.123456789), "12.123");
+	TEST(make_string("{0:.4f}", 12.123456789), "12.1235");
+	TEST(make_string("{0:.5f}", 12.123456789), "12.12346");
 
-	TEST(make_string("{0:.1e}", 12.123456789), "?");
-	TEST(make_string("{0:.2e}", 12.123456789), "?");
-	TEST(make_string("{0:.3e}", 12.123456789), "?");
-	TEST(make_string("{0:.4e}", 12.123456789), "?");
-	TEST(make_string("{0:.5e}", 12.123456789), "?");
+	TEST(make_string("{0:.1e}", 12.123456789), "1.2e+01");
+	TEST(make_string("{0:.2e}", 12.123456789), "1.21e+01");
+	TEST(make_string("{0:.3e}", 12.123456789), "1.212e+01");
+	TEST(make_string("{0:.4e}", 12.123456789), "1.2123e+01");
+	TEST(make_string("{0:.5e}", 12.123456789), "1.21235e+01");
 
 	ERROR_TEST(make_string("{0:.}", 1), "Precision value expected after '.'");
 	std::cout << "----------------------------" << std::endl << std::endl;
@@ -115,12 +115,11 @@ int main ()
 	TEST(make_string("{0:10f}", 0.123456789), "0.123457  ");
 	TEST(make_string("{0:10.1f}", 0.123456789), "0.1       ");
 	TEST(make_string("{0:10.10f}", 0.123456789), "0.1234567890");
-	TEST(make_string("{0:1.20f}", 0.123456789), "0.12345678900000000000");
+	TEST(make_string("{0:1.20f}", 0.123456789), "0.12345678899999999734");
 	TEST(make_string("{0:+20.6f}", 0.123456789), "+0.123457           ");
 	TEST(make_string("{0:-20.6f}", -0.123456789), "-0.123457           ");
 	TEST(make_string("{0:8.5f}", 0.123456789), "0.12346 ");
 
-	ERROR_TEST(make_string("{0:10.}", 1), "Precision value expected after '.'");
 	std::cout << "----------------------------" << std::endl << std::endl;
 
 	std::cout << "flag   ---------------------" << std::endl;
@@ -136,8 +135,8 @@ int main ()
 	TEST(make_string("{0:#X}", -12.42), "-12.4200");
 	TEST(make_string("{0:0}", 12), "12");
 	TEST(make_string("{0:00}", 12), "12");
-	TEST(make_string("{0:010}", 12), "?");
-	TEST(make_string("{0:010.5}", 12.123456789), "?");
+	TEST(make_string("{0:010}", 12), "0000000012");
+	TEST(make_string("{0:010.5}", 12.123456789), "000012.123");
 	std::cout << "----------------------------" << std::endl << std::endl;
 
 	std::cout << "align  ---------------------" << std::endl;
@@ -162,16 +161,9 @@ int main ()
 	TEST(make_string("{0:=+4}", 1), "+  1");
 	TEST(make_string("{0:=+5}", 1), "+   1");
 
-	TEST(make_string("{0:^0}", 1), "?");
-	TEST(make_string("{0:^1}", 1), "?");
-	TEST(make_string("{0:^2}", 1), "?");
-	TEST(make_string("{0:^3}", 1), "?");
-	TEST(make_string("{0:^4}", 1), "?");
-	TEST(make_string("{0:^5}", 1), "?");
-
 	std::cout << "----------------------------" << std::endl << std::endl;
 
-	std::cout << "align  ---------------------" << std::endl;
+	std::cout << "fill   ---------------------" << std::endl;
 	TEST(make_string("{0::<5}", 1), "1::::");
 	TEST(make_string("{0:\'<5}", 1), "1''''");
 	TEST(make_string("{0:\"<5}", 1), "1\"\"\"\"");
@@ -191,12 +183,6 @@ int main ()
 	TEST(make_string("{0:==+5}", 1), "+===1");
 	TEST(make_string("{0:-=+5}", 1), "+---1");
 	TEST(make_string("{0:(=+5}", 1), "+(((1");
-
-	TEST(make_string("{0:=^5}", 1), "?");
-	TEST(make_string("{0:.^5}", 12), "?");
-	TEST(make_string("{0:,^5}", 123), "?");
-	TEST(make_string("{0:/^5}", 1234), "?");
-	TEST(make_string("{0:\\^5}", 1234), "?");
 
 	ERROR_TEST(make_string("{0:d}=+5} {1}", 1, "error"), "Single '}' in format string");
 	std::cout << "----------------------------" << std::endl << std::endl;
